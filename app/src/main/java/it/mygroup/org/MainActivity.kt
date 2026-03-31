@@ -26,10 +26,6 @@ class MainActivity : ComponentActivity() {
         // Avvia il servizio per monitorare la chiusura forzata dell'app (swipe away)
         startService(Intent(this, PresenceService::class.java))
 
-        // Inizializza il modello usando il nuovo SDK Firebase AI Logic
-        val generativeModel = Firebase.ai(backend = GenerativeBackend.vertexAI())
-            .generativeModel("gemini-1.5-pro")
-
         enableEdgeToEdge()
         setContent {
             CacciatoriEPescatoriAppTheme {

@@ -36,6 +36,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.Firebase
+import com.google.firebase.ai.ai
+import com.google.firebase.ai.type.GenerativeBackend
 import it.mygroup.org.network.GoogleSearchApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -70,6 +73,12 @@ fun IAManagerScreen(
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val uriHandler = LocalUriHandler.current
+
+    // Initialize Gemini model
+    val model = remember {
+        Firebase.ai(backend = GenerativeBackend.googleAI())
+            .generativeModel("gemini-2.0-flash")
+    }
 
     val suggestions = listOf(
         "Calendario Venatorio Toscana",
@@ -149,26 +158,22 @@ fun IAManagerScreen(
         isLoading = true
         
         coroutineScope.launch {
-            val greetings = listOf("ciao", "buongiorno", "buonasera", "hey", "chi sei", "aiuto", "help")
-            val isGreeting = greetings.any { text.trim().lowercase() == it }
-            
-            if (isGreeting && !useWeb) {
-                delay(500)
-                messages.add(ChatMessage("Ciao! Sono l'assistente di Venator. Posso aiutarti a trovare calendari venatori, regolamenti di pesca o documenti legali. Dimmi pure cosa ti serve!", false))
-            } else {
+            try {
+                val response = model.generateContent(text)
+                val aiText = response.text ?: "Spiacente, non ho ricevuto una risposta valida."
+                messages.add(ChatMessage(aiText, false))
+            } catch (e: Exception) {
+                Log.e("IAManager", "Error generating content", e)
+                
+                // Fallback to web search if AI fails or for specific queries
                 isSearchingWeb = true
                 val webResults = searchWeb(text)
                 
                 if (webResults.isNotEmpty()) {
-                    val preamble = when {
-                        text.contains("atc", ignoreCase = true) -> "Gli ATC (Ambiti Territoriali di Caccia) gestiscono l'attività venatoria locale. Ecco i documenti e i link ufficiali che ho trovato:"
-                        text.contains("calendario", ignoreCase = true) -> "Ho cercato i calendari venatori più recenti. Ecco i risultati dai portali ufficiali:"
-                        text.contains("legge", ignoreCase = true) || text.contains("regolamento", ignoreCase = true) -> "Ecco i riferimenti normativi e i documenti legali che ho trovato:"
-                        else -> "Ho analizzato la tua richiesta. Ecco le informazioni più rilevanti che ho trovato sul web:"
-                    }
+                    val preamble = "Ho trovato queste informazioni sul web per la tua richiesta:"
                     messages.add(ChatMessage(preamble, false, isWebResult = true, results = webResults))
                 } else {
-                    messages.add(ChatMessage("Spiacente, non sono riuscito a trovare documenti specifici per questa richiesta. Prova a usare termini più precisi (es. 'Calendario Venatorio Lazio PDF').", false))
+                    messages.add(ChatMessage("Spiacente, si è verificato un errore e non ho trovato informazioni utili.", false))
                 }
             }
             isLoading = false
@@ -210,7 +215,7 @@ fun IAManagerScreen(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = "AI Manager", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(text = "Documenti, leggi e calendari ufficiali", style = MaterialTheme.typography.bodySmall)
+                    Text(text = "Assistente Intelligente Venator", style = MaterialTheme.typography.bodySmall)
                 }
                 
                 IconButton(
@@ -244,7 +249,7 @@ fun IAManagerScreen(
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(if (isSearchingWeb) "Analisi portali ufficiali..." else "In elaborazione...", style = MaterialTheme.typography.labelSmall)
+                        Text(if (isSearchingWeb) "Ricerca in corso..." else "Pensando...", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -260,7 +265,7 @@ fun IAManagerScreen(
                     items(suggestions) { suggestion ->
                         FilterChip(
                             selected = false,
-                            onClick = { sendMessage(suggestion, true) },
+                            onClick = { sendMessage(suggestion) },
                             label = { Text(suggestion, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             leadingIcon = { Icon(Icons.Default.Public, null, Modifier.size(12.dp)) },
                             shape = RoundedCornerShape(16.dp),
@@ -275,7 +280,7 @@ fun IAManagerScreen(
                         modifier = Modifier
                             .weight(1f)
                             .heightIn(max = 120.dp),
-                        placeholder = { Text("Chiedi calendari, leggi, atc...", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        placeholder = { Text("Chiedi all'AI...", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         shape = RoundedCornerShape(24.dp),
                         trailingIcon = { IconButton(onClick = { startVoiceInput() }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Mic, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) } },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
