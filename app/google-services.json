@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "491258310836",
+    "project_id": "cacciatoriepescatoriapp",
+    "storage_bucket": "cacciatoriepescatoriapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:491258310836:android:d3d9c855311e94ddd427e1",
+        "android_client_info": {
+          "package_name": "it.mygroup.org"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPWydM1Hk0R4_G843L6sooL3VEE0JGPYc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

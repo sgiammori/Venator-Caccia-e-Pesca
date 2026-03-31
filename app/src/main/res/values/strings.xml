@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">Venator: Caccia e Pesca</string>
+    <string name="app_title">Venator</string>
+    <string name="back_button">Indietro</string>
+    <string name="item_entry_title">Aggiungi Voce</string>
+    <string name="no_item_description">Nessun elemento inserito per oggi.</string>
+    <string name="privacy_policy_title">Privacy Policy</string>
+    <string name="date_stocked">Data: %1$s/%2$s/%3$s</string>
+    <string name="in_stock">Quantità: %1$d</string>
+    <string name="weight_info">Peso: %1$.2f Kg</string>
+    <string name="item_storico_title">Storico Voci</string>
+    <string name="item_detail_title">Dettaglio Voce</string>
+    <string name="edit_item_title">Modifica Voce</string>
+    <string name="delete">Elimina</string>
+    <string name="attention">Attenzione</string>
+    <string name="delete_question">Sei sicuro di voler eliminare questa voce?</string>
+    <string name="yes">Sì</string>
+    <string name="no">No</string>
+    <string name="item">Preda</string>
+    <string name="quantity_in_stock">Quantità</string>
+    <string name="quantity">Qtà: %1$s</string>
+    <string name="weight_title">Peso</string>
+    <string name="data_saved">Data Salvataggio</string>
+    <string name="item_storicopage_title">Riepilogo Periodo</string>
+</resources>
