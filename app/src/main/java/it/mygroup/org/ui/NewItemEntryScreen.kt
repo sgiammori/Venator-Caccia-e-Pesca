@@ -23,6 +23,7 @@ import it.mygroup.org.InventoryTopAppBar
 import it.mygroup.org.R
 import it.mygroup.org.data.ActivityType
 import it.mygroup.org.ui.navigation.NavigationDestination
+import it.mygroup.org.ui.theme.rememberResponsiveUiSpec
 import it.mygroup.org.viewmodels.HomeUiState
 import it.mygroup.org.viewmodels.ItemDetails
 import it.mygroup.org.viewmodels.ItemEntryViewModel
@@ -83,11 +84,12 @@ fun NewEntryScreenContent(
     onSaveClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val focusManager = LocalFocusManager.current
+    val uiSpec = rememberResponsiveUiSpec()
 
     Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0), // RIMUOVE SPAZIO EXTRA IN FONDO
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         modifier = modifier
             .nestedScroll(scrollBehavior.nestedScrollConnection)
             .clickable { focusManager.clearFocus() },
@@ -96,7 +98,10 @@ fun NewEntryScreenContent(
                 title = stringResource(ItemNewEntryDestination.titleRes),
                 canNavigateBack = canNavigateBack,
                 navigateUp = { navigateBack() },
-                scrollBehavior = scrollBehavior
+                scrollBehavior = scrollBehavior,
+                showAdd = false,
+                showStorico = false,
+                showMenu = false
             )
         }
     ) { innerPadding ->
@@ -105,6 +110,7 @@ fun NewEntryScreenContent(
             itemUiState = itemUiState,
             onItemValueChange = onItemValueChange,
             onSaveClick = onSaveClick,
+            uiSpec = uiSpec,
             modifier = Modifier
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
@@ -119,9 +125,12 @@ fun NewEntryBody(
     itemUiState: ItemUIState,
     onSaveClick: () -> Unit,
     onItemValueChange: (ItemDetails) -> Unit,
+    uiSpec: it.mygroup.org.ui.theme.ResponsiveUiSpec = rememberResponsiveUiSpec(),
     modifier: Modifier = Modifier
 ) {
-    val commonHeight = 56.dp
+    val commonHeight = if (uiSpec.isLargeText) 60.dp else 56.dp
+    val sectionGap = if (uiSpec.isLargeText) 18.dp else 16.dp
+    val blockGap = if (uiSpec.isLargeText) 26.dp else 24.dp
     var showDatePicker by remember { mutableStateOf(false) }
 
     Column(
@@ -129,7 +138,7 @@ fun NewEntryBody(
         verticalArrangement = Arrangement.Top,
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(horizontal = uiSpec.screenHorizontalPadding, vertical = if (uiSpec.isLargeText) 18.dp else 16.dp)
     ) {
         Text(
             text = "Nome preda",
@@ -144,15 +153,15 @@ fun NewEntryBody(
             colors = TextFieldDefaults.colors(),
         )
         
-        Spacer(modifier = Modifier.height(16.dp))
-        
+        Spacer(modifier = Modifier.height(sectionGap))
+
         Text(
             text = "Tipo di attività",
             style = MaterialTheme.typography.labelLarge
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(uiSpec.listItemSpacing)
         ) {
             ActivityTypeButton(
                 text = "Caccia",
@@ -168,8 +177,8 @@ fun NewEntryBody(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-        
+        Spacer(modifier = Modifier.height(sectionGap))
+
         Text(
             text = "Quantità",
             style = MaterialTheme.typography.labelLarge
@@ -184,8 +193,8 @@ fun NewEntryBody(
             colors = TextFieldDefaults.colors(),
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
-        
+        Spacer(modifier = Modifier.height(sectionGap))
+
         Text(
             text = "Peso (Kg)",
             style = MaterialTheme.typography.labelLarge
@@ -200,8 +209,8 @@ fun NewEntryBody(
             colors = TextFieldDefaults.colors(),
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
-        
+        Spacer(modifier = Modifier.height(blockGap))
+
         val displayDate = if (itemDetails.day.isNotEmpty()) {
             "${itemDetails.day}/${itemDetails.month}/${itemDetails.year}"
         } else {
@@ -219,16 +228,16 @@ fun NewEntryBody(
             shape = RoundedCornerShape(8.dp)
         ) {
             Row(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(if (uiSpec.isLargeText) 18.dp else 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     Icons.Default.CalendarToday, 
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(if (uiSpec.isLargeText) 26.dp else 24.dp)
                 )
-                Spacer(Modifier.width(16.dp))
+                Spacer(Modifier.width(if (uiSpec.isLargeText) 18.dp else 16.dp))
                 Text(
                     text = displayDate,
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
@@ -236,8 +245,8 @@ fun NewEntryBody(
             }
         }
         
-        Spacer(modifier = Modifier.height(24.dp))
-        
+        Spacer(modifier = Modifier.height(blockGap))
+
         Button(
             onClick = onSaveClick,
             enabled = itemUiState.isValid,
@@ -247,8 +256,7 @@ fun NewEntryBody(
             Text(text = "Salva")
         }
         
-        // Spazio finale per evitare che il pulsante "Salva" sia coperto dal banner
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(sectionGap))
     }
 
     if (showDatePicker) {
@@ -296,9 +304,11 @@ fun ActivityTypeButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val uiSpec = rememberResponsiveUiSpec()
+
     Button(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.heightIn(min = if (uiSpec.isLargeText) 44.dp else 40.dp),
         colors = if (isSelected) {
             ButtonDefaults.buttonColors()
         } else {

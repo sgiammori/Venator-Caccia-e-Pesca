@@ -4,9 +4,11 @@ import android.app.Activity
 import android.content.Intent
 import android.speech.RecognizerIntent
 import android.util.Log
+import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -29,17 +31,31 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
 import it.mygroup.org.network.GoogleSearchApi
+import it.mygroup.org.ui.components.AdBannerController
+import it.mygroup.org.ui.theme.rememberResponsiveUiSpec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -64,6 +80,7 @@ data class ChatMessage(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IAManagerScreen(
+    initialQuery: String = "",
     modifier: Modifier = Modifier
 ) {
     var inputText by remember { mutableStateOf("") }
@@ -73,11 +90,56 @@ fun IAManagerScreen(
     val coroutineScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val uiSpec = rememberResponsiveUiSpec()
+    val view = LocalView.current
+
+    var isInputFocused by remember { mutableStateOf(false) }
+    var isKeyboardOpen by remember { mutableStateOf(false) }
+
+    // Rilevamento tastiera affidabile tramite ridimensionamento della finestra
+    DisposableEffect(view) {
+        val listener = android.view.ViewTreeObserver.OnGlobalLayoutListener {
+            val rect = android.graphics.Rect()
+            view.getWindowVisibleDisplayFrame(rect)
+            val screenHeight = view.rootView.height
+            val keypadHeight = screenHeight - rect.bottom
+            // Soglia empirica del 15% dell'altezza dello schermo per rilevare la tastiera
+            val isOpen = keypadHeight > screenHeight * 0.15
+            if (isKeyboardOpen != isOpen) {
+                isKeyboardOpen = isOpen
+            }
+        }
+        view.viewTreeObserver.addOnGlobalLayoutListener(listener)
+        onDispose {
+            view.viewTreeObserver.removeOnGlobalLayoutListener(listener)
+        }
+    }
+
+    // Imposta il ridimensionamento della finestra per questo schermo
+    DisposableEffect(Unit) {
+        val activity = context as? Activity
+        val window = activity?.window
+        val previousSoftInputMode = window?.attributes?.softInputMode
+
+        @Suppress("DEPRECATION")
+        window?.setSoftInputMode(
+            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN
+        )
+
+        onDispose {
+            // Ripristina la modalità precedente e assicura che il banner sia visibile uscendo
+            previousSoftInputMode?.let { window.setSoftInputMode(it) }
+            AdBannerController.isVisible = true
+        }
+    }
 
     // Initialize Gemini model
     val model = remember {
         Firebase.ai(backend = GenerativeBackend.googleAI())
-            .generativeModel("gemini-2.0-flash")
+            .generativeModel("gemini-3-flash-preview")
     }
 
     val suggestions = listOf(
@@ -153,6 +215,8 @@ fun IAManagerScreen(
 
     fun sendMessage(text: String, useWeb: Boolean = false) {
         if (text.isBlank()) return
+        focusManager.clearFocus()
+        isInputFocused = false
         messages.add(ChatMessage(text, true))
         inputText = ""
         isLoading = true
@@ -165,7 +229,7 @@ fun IAManagerScreen(
             } catch (e: Exception) {
                 Log.e("IAManager", "Error generating content", e)
                 
-                // Fallback to web search if AI fails or for specific queries
+                // Fallback to web search if AI fails
                 isSearchingWeb = true
                 val webResults = searchWeb(text)
                 
@@ -178,6 +242,26 @@ fun IAManagerScreen(
             }
             isLoading = false
             isSearchingWeb = false
+        }
+    }
+
+    // Handle initial query
+    LaunchedEffect(initialQuery) {
+        if (initialQuery.isNotBlank() && messages.isEmpty()) {
+            sendMessage(initialQuery)
+        }
+    }
+
+    // Sincronizzazione Banner e Focus: il banner scompare se c'è focus O tastiera aperta
+    LaunchedEffect(isKeyboardOpen, isInputFocused) {
+        AdBannerController.isVisible = !isKeyboardOpen && !isInputFocused
+    }
+
+    // Quando la tastiera si chiude (es. primo back), resettiamo il focus immediatamente
+    LaunchedEffect(isKeyboardOpen) {
+        if (!isKeyboardOpen) {
+            focusManager.clearFocus()
+            isInputFocused = false
         }
     }
 
@@ -201,48 +285,38 @@ fun IAManagerScreen(
     }
 
     LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+        if (messages.isNotEmpty()) {
+            listState.scrollToItem(messages.size - 1)
+        }
     }
 
-    Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        Surface(tonalElevation = 4.dp, modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "AI Manager", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(text = "Assistente Intelligente Venator", style = MaterialTheme.typography.bodySmall)
-                }
-                
-                IconButton(
-                    onClick = { messages.clear() },
-                    enabled = messages.isNotEmpty()
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteSweep,
-                            contentDescription = "Pulisci",
-                            tint = if (messages.isNotEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline
-                        )
-                        Text("Clean", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = if (messages.isNotEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline)
-                    }
-                }
-            }
-        }
-
-        LazyColumn(state = listState, modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(messages) { message ->
-                ChatBubble(message, onLinkClick = { link ->
-                    try {
-                        uriHandler.openUri(link)
-                    } catch (e: Exception) {
-                        Log.e("IAManager", "Error opening URI: $link", e)
-                    }
-                })
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+            // No .imePadding() to avoid extra space with ADJUST_RESIZE
+    ) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentPadding = PaddingValues(uiSpec.screenHorizontalPadding),
+            verticalArrangement = Arrangement.spacedBy(uiSpec.listItemSpacing)
+        ) {
+            items(items = messages, key = { it.timestamp }) { message ->
+                ChatBubble(
+                    message = message,
+                    onLinkClick = { link ->
+                        try {
+                            uriHandler.openUri(link)
+                        } catch (e: Exception) {
+                            Log.e("IAManager", "Error opening URI: $link", e)
+                        }
+                    },
+                    bubbleMaxWidth = uiSpec.chatBubbleMaxWidth,
+                    resultCardMaxWidth = uiSpec.resultCardMaxWidth
+                )
             }
             if (isLoading) {
                 item {
@@ -255,44 +329,96 @@ fun IAManagerScreen(
             }
         }
 
-        Surface(tonalElevation = 8.dp, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(bottom = 4.dp),
-                    contentPadding = PaddingValues(horizontal = 4.dp)
-                ) {
-                    items(suggestions) { suggestion ->
-                        FilterChip(
-                            selected = false,
-                            onClick = { sendMessage(suggestion) },
-                            label = { Text(suggestion, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            leadingIcon = { Icon(Icons.Default.Public, null, Modifier.size(12.dp)) },
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.height(32.dp)
-                        )
+        Surface(
+            tonalElevation = 8.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(
+                    start = 8.dp,
+                    end = 8.dp,
+                    top = if (isKeyboardOpen || isInputFocused) 0.dp else 4.dp,
+                    bottom = if (isKeyboardOpen || isInputFocused) 8.dp else 4.dp
+                )
+            ) {
+                if (!isKeyboardOpen && !isInputFocused) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            onClick = { messages.clear() },
+                            enabled = messages.isNotEmpty(),
+                            modifier = Modifier.heightIn(min = uiSpec.actionButtonSize)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteSweep,
+                                contentDescription = "Pulisci",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Pulisci", fontSize = uiSpec.chipTextSize)
+                        }
+                    }
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(bottom = 4.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    ) {
+                        items(suggestions) { suggestion ->
+                            FilterChip(
+                                selected = false,
+                                onClick = { sendMessage(suggestion) },
+                                label = {
+                                    Text(
+                                        suggestion,
+                                        fontSize = uiSpec.chipTextSize,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
+                                leadingIcon = { Icon(Icons.Default.Public, null, Modifier.size(16.dp)) },
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.height(uiSpec.chipHeight)
+                            )
+                        }
                     }
                 }
+
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = inputText,
                         onValueChange = { inputText = it },
                         modifier = Modifier
                             .weight(1f)
-                            .heightIn(max = 120.dp),
+                            .onFocusChanged { isInputFocused = it.isFocused }
+                            .heightIn(min = uiSpec.actionButtonSize, max = 120.dp),
                         placeholder = { Text("Chiedi all'AI...", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         shape = RoundedCornerShape(24.dp),
-                        trailingIcon = { IconButton(onClick = { startVoiceInput() }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Mic, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp)) } },
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { startVoiceInput() },
+                                modifier = Modifier.size(uiSpec.actionButtonSize)
+                            ) {
+                                Icon(
+                                    Icons.Default.Mic,
+                                    null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                         keyboardActions = KeyboardActions(onSend = { sendMessage(inputText) }),
-                        textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)
+                        textStyle = LocalTextStyle.current.copy(fontSize = uiSpec.inputTextSize)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(if (uiSpec.isLargeText) 10.dp else 8.dp))
                     IconButton(
                         onClick = { sendMessage(inputText) },
                         enabled = inputText.isNotBlank() && !isLoading,
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(uiSpec.actionButtonSize)
                             .background(MaterialTheme.colorScheme.primary, CircleShape)
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Send, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
@@ -303,20 +429,111 @@ fun IAManagerScreen(
     }
 }
 
+private val messageTokenRegex = "(?i)\\b((?:https?://|www\\.)[^\\s<>()]+|[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,})".toRegex()
+
+private fun trimTrailingPunctuation(raw: String): String =
+    raw.trimEnd('.', ',', ';', ':', '!', '?', ')', ']', '}')
+
+private fun normalizeOutgoingUrl(raw: String): String {
+    val trimmed = trimTrailingPunctuation(raw)
+    return if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        trimmed
+    } else {
+        "https://$trimmed"
+    }
+}
+
+private fun normalizeOutgoingEmail(raw: String): String {
+    val trimmed = trimTrailingPunctuation(raw)
+    return if (trimmed.startsWith("mailto:", ignoreCase = true)) trimmed else "mailto:$trimmed"
+}
+
 @Composable
-fun ChatBubble(message: ChatMessage, onLinkClick: (String) -> Unit) {
+private fun LinkifiedMessageText(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    val linkColor = MaterialTheme.colorScheme.primary
+    val baseStyle = MaterialTheme.typography.bodyMedium
+
+    val annotated = remember(text, linkColor) {
+        buildAnnotatedString {
+            var lastIndex = 0
+            messageTokenRegex.findAll(text).forEach { match ->
+                val start = match.range.first
+                val endExclusive = match.range.last + 1
+
+                if (start > lastIndex) {
+                    append(text.substring(lastIndex, start))
+                }
+
+                val displayedToken = trimTrailingPunctuation(match.value)
+                val normalizedTarget = if (displayedToken.contains("@") &&
+                    !displayedToken.startsWith("http://", ignoreCase = true) &&
+                    !displayedToken.startsWith("https://", ignoreCase = true)
+                ) {
+                    normalizeOutgoingEmail(displayedToken)
+                } else {
+                    normalizeOutgoingUrl(displayedToken)
+                }
+
+                withLink(
+                    LinkAnnotation.Url(
+                        url = normalizedTarget,
+                        styles = TextLinkStyles(
+                            style = SpanStyle(
+                                color = linkColor,
+                                textDecoration = TextDecoration.Underline
+                            )
+                        )
+                    )
+                ) {
+                    append(displayedToken)
+                }
+
+                lastIndex = endExclusive
+            }
+
+            if (lastIndex < text.length) {
+                append(text.substring(lastIndex))
+            }
+        }
+    }
+
+    Text(
+        text = annotated,
+        style = baseStyle,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun ChatBubble(
+    message: ChatMessage,
+    onLinkClick: (String) -> Unit,
+    bubbleMaxWidth: Dp,
+    resultCardMaxWidth: Dp
+) {
     val alignment = if (message.isUser) Alignment.End else Alignment.Start
     val color = if (message.isUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer
-    
+
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = alignment) {
-        Box(modifier = Modifier.widthIn(max = 320.dp).clip(RoundedCornerShape(12.dp)).background(color).padding(12.dp)) {
-            Text(text = message.text, style = MaterialTheme.typography.bodyMedium)
+        Box(
+            modifier = Modifier
+                .widthIn(max = bubbleMaxWidth)
+                .clip(RoundedCornerShape(12.dp))
+                .background(color)
+                .padding(12.dp)
+        ) {
+            LinkifiedMessageText(
+                text = message.text
+            )
         }
-        
+
         if (message.results.isNotEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
             message.results.forEach { result ->
-                ResultCard(result, onLinkClick)
+                ResultCard(result = result, onLinkClick = onLinkClick, maxWidth = resultCardMaxWidth)
                 Spacer(modifier = Modifier.height(4.dp))
             }
         }
@@ -324,37 +541,51 @@ fun ChatBubble(message: ChatMessage, onLinkClick: (String) -> Unit) {
 }
 
 @Composable
-fun ResultCard(result: SearchResult, onLinkClick: (String) -> Unit) {
+fun ResultCard(result: SearchResult, onLinkClick: (String) -> Unit, maxWidth: Dp) {
     val isPdf = result.link.lowercase().endsWith(".pdf")
     Card(
-        modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth(),
+        modifier = Modifier.widthIn(max = maxWidth).fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(
+            modifier = Modifier
+                .clickable { onLinkClick(result.link) }
+                .padding(12.dp)
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = if (isPdf) Icons.Default.Description else Icons.Default.Public,
+                    imageVector = if (isPdf) Icons.Default.Description else Icons.AutoMirrored.Filled.OpenInNew,
                     contentDescription = null,
-                    tint = if (isPdf) Color(0xFFD32F2F) else MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(text = result.title, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    text = result.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (result.snippet.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = result.snippet,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             Spacer(modifier = Modifier.height(4.dp))
-            Text(text = result.snippet, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = { onLinkClick(result.link) },
-                modifier = Modifier.fillMaxWidth().height(36.dp),
-                contentPadding = PaddingValues(0.dp),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(Icons.AutoMirrored.Filled.OpenInNew, null, modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(if (isPdf) "Scarica PDF" else "Apri Sito", fontSize = 12.sp)
-            }
+            Text(
+                text = result.link,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

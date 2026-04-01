@@ -50,7 +50,6 @@ fun HomeScreen(
     onItemSavedConsumed: () -> Unit = {},
     rssViewModel: RssViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val context = LocalContext.current
     val presenceManager = remember { UserPresenceManager.getInstance(context) }
     val userId = presenceManager.userId
@@ -58,6 +57,10 @@ fun HomeScreen(
     var currentSubView by rememberSaveable { mutableStateOf(HomeSubView.RSS) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
+    var aiInitialQuery by rememberSaveable { mutableStateOf("") }
+
+    // Utilizzo pinnedScrollBehavior per mantenere l'app bar fissa
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     BackHandler(enabled = isSearchActive || currentSubView != HomeSubView.RSS) {
         if (isSearchActive) {
@@ -76,9 +79,20 @@ fun HomeScreen(
         }
     }
 
+    LaunchedEffect(currentSubView) {
+        if (currentSubView == HomeSubView.AI_MANAGER && isSearchActive) {
+            isSearchActive = false
+            searchQuery = ""
+        }
+        // Se usciamo dall'AI Manager, resettiamo la query iniziale per la prossima volta
+        if (currentSubView != HomeSubView.AI_MANAGER) {
+            aiInitialQuery = ""
+        }
+    }
+
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = WindowInsets(0, 0, 0, 0), // RIMUOVE SPAZI VUOTI EXTRA
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             Column {
                 InventoryTopAppBar(
@@ -87,6 +101,9 @@ fun HomeScreen(
                     navigateUp = {},
                     scrollBehavior = scrollBehavior,
                     showSearch = currentSubView == HomeSubView.RSS || currentSubView == HomeSubView.EVENTS,
+                    showAdd = true,
+                    showStorico = true,
+                    showMenu = true,
                     isSearchActive = isSearchActive,
                     onSearchActiveChange = { isSearchActive = it },
                     searchQuery = searchQuery,
@@ -138,6 +155,10 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxSize()
                 )
                 HomeSubView.MAP -> MapsScreen(
+                    onConsultAI = { query ->
+                        aiInitialQuery = query
+                        currentSubView = HomeSubView.AI_MANAGER
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
                 HomeSubView.DATABASE -> ItemDailyEntries(
@@ -151,6 +172,7 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxSize()
                 )
                 HomeSubView.AI_MANAGER -> IAManagerScreen(
+                    initialQuery = aiInitialQuery,
                     modifier = Modifier.fillMaxSize()
                 )
             }

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -28,6 +29,7 @@ import it.mygroup.org.ui.StoricoPageScreenDestination
 import it.mygroup.org.ui.StoricoScreen
 import it.mygroup.org.ui.StoricoScreenDestination
 import it.mygroup.org.ui.components.AdBanner
+import it.mygroup.org.ui.components.AdBannerController
 
 @Composable
 fun CacciaPescaNavHost(
@@ -37,8 +39,11 @@ fun CacciaPescaNavHost(
     val context = LocalContext.current
     
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
-            AdBanner()
+            if (AdBannerController.isVisible) {
+                AdBanner()
+            }
         }
     ) { innerPadding ->
         NavHost(

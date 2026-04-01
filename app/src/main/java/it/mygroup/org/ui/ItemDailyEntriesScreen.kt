@@ -12,7 +12,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -22,6 +21,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import it.mygroup.org.R
 import it.mygroup.org.data.Item
 import it.mygroup.org.ui.navigation.NavigationDestination
+import it.mygroup.org.ui.theme.WidthClass
+import it.mygroup.org.ui.theme.rememberResponsiveUiSpec
 import it.mygroup.org.viewmodels.ItemEntryViewModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -40,6 +41,8 @@ fun ItemDailyEntries(
     viewModel: ItemEntryViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val homeUiState by viewModel.homeUiState.collectAsState()
+    val uiSpec = rememberResponsiveUiSpec()
+    val fabPadding = if (uiSpec.isLargeText) uiSpec.screenHorizontalPadding + 4.dp else uiSpec.screenHorizontalPadding
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -49,7 +52,9 @@ fun ItemDailyEntries(
                 shape = MaterialTheme.shapes.medium,
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_large))
+                modifier = Modifier
+                    .padding(fabPadding)
+                    .size(if (uiSpec.isLargeText) 60.dp else 56.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
@@ -62,7 +67,8 @@ fun ItemDailyEntries(
         HomeBody(
             itemList = homeUiState.itemList,
             onItemClick = navigateToItemUpdate,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding),
+            uiSpec = uiSpec
         )
     }
 }
@@ -72,15 +78,22 @@ fun HomeBody(
     itemList: List<Item>,
     onItemClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(0.dp)
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    uiSpec: it.mygroup.org.ui.theme.ResponsiveUiSpec = rememberResponsiveUiSpec()
 ) {
+    val watermarkSize = when (uiSpec.widthClass) {
+        WidthClass.Compact -> if (uiSpec.isLargeText) 72.sp else 80.sp
+        WidthClass.Medium -> if (uiSpec.isLargeText) 84.sp else 92.sp
+        WidthClass.Expanded -> if (uiSpec.isLargeText) 92.sp else 100.sp
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
         // Testo di sfondo "Carniere" centrato
         Text(
             text = "Carniere",
             style = MaterialTheme.typography.displayLarge.copy(
                 fontWeight = FontWeight.Black,
-                fontSize = 80.sp
+                fontSize = watermarkSize
             ),
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
             modifier = Modifier.align(Alignment.Center),
@@ -99,8 +112,8 @@ fun HomeBody(
                         color = MaterialTheme.colorScheme.outline,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
-                            .padding(16.dp)
-                            .offset(y = (-60).dp) // Sposta il testo leggermente più in alto rispetto al centro (e alla parola Carniere)
+                            .padding(uiSpec.screenHorizontalPadding)
+                            .offset(y = if (uiSpec.isLargeText) (-48).dp else (-60).dp)
                     )
                 }
             } else {
@@ -108,7 +121,8 @@ fun HomeBody(
                     itemList = itemList,
                     onItemClick = { onItemClick(it.id) },
                     contentPadding = contentPadding,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    uiSpec = uiSpec
                 )
             }
         }
@@ -120,7 +134,8 @@ private fun InventoryList(
     itemList: List<Item>,
     onItemClick: (Item) -> Unit,
     contentPadding: PaddingValues,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    uiSpec: it.mygroup.org.ui.theme.ResponsiveUiSpec
 ) {
     LazyColumn(
         modifier = modifier,
@@ -130,7 +145,7 @@ private fun InventoryList(
             end = contentPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
             bottom = 0.dp
         ),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(uiSpec.listItemSpacing)
     ) {
         item {
             val calendar = Calendar.getInstance().time
@@ -143,7 +158,10 @@ private fun InventoryList(
                 ),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                modifier = Modifier.padding(
+                    horizontal = uiSpec.screenHorizontalPadding,
+                    vertical = if (uiSpec.isLargeText) 10.dp else 8.dp
+                )
             )
         }
 
@@ -152,12 +170,12 @@ private fun InventoryList(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = dimensionResource(id = R.dimen.padding_small))
-                    .padding(bottom = 8.dp),
+                    .padding(horizontal = uiSpec.screenHorizontalPadding)
+                    .padding(bottom = uiSpec.listItemSpacing),
                 color = MaterialTheme.colorScheme.primaryContainer,
                 shape = MaterialTheme.shapes.medium
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(if (uiSpec.isLargeText) 18.dp else 16.dp)) {
                     Text(
                         text = "Peso Totale Oggi",
                         style = MaterialTheme.typography.labelLarge,
@@ -177,7 +195,7 @@ private fun InventoryList(
             InventoryItem(
                 item = item,
                 modifier = Modifier
-                    .padding(horizontal = dimensionResource(id = R.dimen.padding_small))
+                    .padding(horizontal = uiSpec.screenHorizontalPadding)
                     .clickable { onItemClick(item) }
             )
         }
@@ -189,16 +207,18 @@ fun InventoryItem(
     item: Item,
     modifier: Modifier = Modifier
 ) {
+    val uiSpec = rememberResponsiveUiSpec()
+
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (uiSpec.isLargeText) 3.dp else 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_large)),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(if (uiSpec.isLargeText) 18.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(if (uiSpec.isLargeText) 10.dp else 8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -221,7 +241,7 @@ fun InventoryItem(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(if (uiSpec.isLargeText) 18.dp else 16.dp)
             ) {
                 Text(
                     text = stringResource(R.string.in_stock, item.quantity),

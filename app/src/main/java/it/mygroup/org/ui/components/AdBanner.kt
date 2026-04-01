@@ -19,7 +19,7 @@ import com.google.android.gms.ads.AdView
 
 /**
  * A clean AdBanner component.
- * Uses navigationBarsPadding to stay above system keys without creating extra gaps.
+ * Layout management is left to the parent container (e.g. Scaffold bottomBar).
  */
 @Composable
 fun AdBanner(modifier: Modifier = Modifier) {
@@ -46,7 +46,7 @@ fun AdBanner(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .navigationBarsPadding() // Precision position above system bar
+            .navigationBarsPadding()
             .height(50.dp),
         contentAlignment = Alignment.Center
     ) {

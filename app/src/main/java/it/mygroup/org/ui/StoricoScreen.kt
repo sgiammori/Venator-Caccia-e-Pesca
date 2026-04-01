@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -34,13 +35,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import it.mygroup.org.InventoryTopAppBar
 import it.mygroup.org.R
 import it.mygroup.org.ui.navigation.NavigationDestination
+import it.mygroup.org.ui.theme.rememberResponsiveUiSpec
 import it.mygroup.org.viewmodels.StoricoViewModel
 
 object StoricoScreenDestination : NavigationDestination {
@@ -57,8 +58,9 @@ fun StoricoScreen(
     modifier: Modifier = Modifier,
     viewModel: StoricoViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val storicoUiState by viewModel.storicoUiState.collectAsState()
+    val uiSpec = rememberResponsiveUiSpec()
 
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -67,7 +69,10 @@ fun StoricoScreen(
                 title = stringResource(StoricoScreenDestination.titleRes),
                 canNavigateBack = canNavigateBack,
                 navigateUp = { navigateBack() },
-                scrollBehavior = scrollBehavior
+                scrollBehavior = scrollBehavior,
+                showAdd = false,
+                showStorico = false,
+                showMenu = false
             )
         }
     ) { innerPadding ->
@@ -89,7 +94,8 @@ fun StoricoScreen(
                 itemList = storicoUiState.itemList,
                 onItemClick = onNavigateToStoricoPage,
                 contentPadding = innerPadding,
-                modifier = Modifier.padding(horizontal = dimensionResource(id = R.dimen.padding_small))
+                modifier = Modifier.padding(horizontal = uiSpec.screenHorizontalPadding),
+                uiSpec = uiSpec
             )
         }
     }
@@ -100,19 +106,21 @@ private fun StoricoList(
     itemList: List<String>,
     onItemClick: (String, String) -> Unit,
     contentPadding: PaddingValues,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    uiSpec: it.mygroup.org.ui.theme.ResponsiveUiSpec = rememberResponsiveUiSpec()
 ) {
     LazyColumn(
         modifier = modifier,
-        contentPadding = contentPadding
+        contentPadding = contentPadding,
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(uiSpec.listItemSpacing)
     ) {
         items(items = itemList, key = { it }) { item ->
             StoricoItem(item = item,
                 modifier = Modifier
-                    .padding(dimensionResource(id = R.dimen.padding_small))
                     .clickable { onItemClick(item, "0") },
                 year = item,
-                onItemClick = onItemClick
+                onItemClick = onItemClick,
+                uiSpec = uiSpec
             )
         }
     }
@@ -124,15 +132,16 @@ private fun StoricoItem(
     modifier: Modifier = Modifier,
     year: String,
     onItemClick: (String, String) -> Unit,
+    uiSpec: it.mygroup.org.ui.theme.ResponsiveUiSpec = rememberResponsiveUiSpec()
 ) {
     Card(
         modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = if (uiSpec.isLargeText) 3.dp else 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(dimensionResource(id = R.dimen.padding_small)),
+                .padding(if (uiSpec.isLargeText) 14.dp else 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -140,20 +149,24 @@ private fun StoricoItem(
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.weight(1f)
             )
-            MinimalDropdownMenuByStorico(year = year, onItemClick)
+            MinimalDropdownMenuByStorico(year = year, onItemClick = onItemClick, uiSpec = uiSpec)
         }
     }
 }
 
 @Composable
-fun MinimalDropdownMenuByStorico(year: String, onItemClick: (String, String) -> Unit) {
+fun MinimalDropdownMenuByStorico(
+    year: String,
+    onItemClick: (String, String) -> Unit,
+    uiSpec: it.mygroup.org.ui.theme.ResponsiveUiSpec = rememberResponsiveUiSpec()
+) {
     var expanded by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
-            .padding(8.dp)
+            .padding(if (uiSpec.isLargeText) 10.dp else 8.dp)
     ) {
-        IconButton(onClick = { expanded = !expanded }) {
+        IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(uiSpec.actionButtonSize)) {
             Icon(Icons.Default.MoreVert, contentDescription = "More options")
         }
         DropdownMenu(

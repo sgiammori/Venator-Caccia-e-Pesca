@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationCompat
 import it.mygroup.org.network.CacciaPescaApi
 import it.mygroup.org.network.UserPresenceManager
+import it.mygroup.org.ui.theme.rememberResponsiveUiSpec
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -68,49 +69,55 @@ fun CalendarEventScreen(
     val context = LocalContext.current
     val presenceManager = remember { UserPresenceManager.getInstance(context) }
     val coroutineScope = rememberCoroutineScope()
-    
+    val uiSpec = rememberResponsiveUiSpec()
+
+    val sectionGap = if (uiSpec.isLargeText) 12.dp else 8.dp
+    val cardInnerPadding = if (uiSpec.isLargeText) 12.dp else 8.dp
+    val contactListMaxHeight = if (uiSpec.isLargeText) 240.dp else 200.dp
+    val communityActionSize = uiSpec.actionButtonSize
+
     val calendar = Calendar.getInstance()
     var selectedDateMillis by remember { mutableLongStateOf(calendar.timeInMillis) }
     var showDatePicker by remember { mutableStateOf(false) }
-    
+
     val formattedDate = remember(selectedDateMillis) {
         val cal = Calendar.getInstance().apply { timeInMillis = selectedDateMillis }
         "${cal.get(Calendar.DAY_OF_MONTH)}/${cal.get(Calendar.MONTH) + 1}/${cal.get(Calendar.YEAR)}"
     }
-    
+
     var showCreateDialog by remember { mutableStateOf(false) }
     var showFriendsDialog by remember { mutableStateOf(false) }
     var eventTitle by remember { mutableStateOf("") }
     var eventDescription by remember { mutableStateOf("") }
-    
+
     // State for details view
     var selectedEventForDetails by remember { mutableStateOf<CalendarEvent?>(null) }
-    
+
     // States for friend management
     var localFriendSearchQuery by remember { mutableStateOf("") }
     val allUsers = remember { mutableStateListOf<UserData>() }
-    
+
     // Load friends from persistent storage
     val friends = remember { mutableStateListOf<String>().apply { addAll(presenceManager.getFriends()) } }
-    
+
     val invitations = remember { mutableStateListOf<CalendarEventInvitation>() }
-    
+
     // Persistence management
     val sharedPrefs = remember { context.getSharedPreferences("calendar_prefs", Context.MODE_PRIVATE) }
-    
-    val handledEventIds = remember { 
-        mutableStateListOf<String>().apply { 
-            addAll(sharedPrefs.getStringSet("handled_events", emptySet()) ?: emptySet()) 
-        } 
+
+    val handledEventIds = remember {
+        mutableStateListOf<String>().apply {
+            addAll(sharedPrefs.getStringSet("handled_events", emptySet()) ?: emptySet())
+        }
     }
 
-    val notifiedEventIds = remember { 
-        mutableStateListOf<String>().apply { 
-            addAll(sharedPrefs.getStringSet("notified_events", emptySet()) ?: emptySet()) 
-        } 
+    val notifiedEventIds = remember {
+        mutableStateListOf<String>().apply {
+            addAll(sharedPrefs.getStringSet("notified_events", emptySet()) ?: emptySet())
+        }
     }
-    
-    val acceptedEvents = remember { 
+
+    val acceptedEvents = remember {
         mutableStateListOf<CalendarEvent>().apply {
             val savedJson = sharedPrefs.getString("accepted_events_json", "[]")
             try {
@@ -168,14 +175,14 @@ fun CalendarEventScreen(
                 // 1. Fetch Invites
                 val invitesResponse = CacciaPescaApi.retrofitService.getInvites(userId)
                 Log.d("CalendarEvent", "Invites raw response: $invitesResponse")
-                
+
                 try {
                     val invitesArray = JSONArray(invitesResponse)
                     val newInvites = mutableListOf<CalendarEventInvitation>()
                     for (i in 0 until invitesArray.length()) {
                         val obj = invitesArray.getJSONObject(i)
                         val eventId = obj.getString("_id")
-                        
+
                         // Skip if already accepted or refused
                         if (handledEventIds.contains(eventId)) continue
 
@@ -189,7 +196,7 @@ fun CalendarEventScreen(
                             isReceived = notifiedEventIds.contains(eventId)
                         )
                         val senderId = if (obj.has("senderId")) obj.getString("senderId") else ownerId
-                        
+
                         val invitation = CalendarEventInvitation(event, senderId)
                         newInvites.add(invitation)
 
@@ -212,7 +219,7 @@ fun CalendarEventScreen(
                 // 2. Fetch all users status
                 val usersResponse = CacciaPescaApi.retrofitService.getAllUsers()
                 val usersArray = JSONArray(usersResponse)
-                
+
                 val newList = mutableListOf<UserData>()
                 for (i in 0 until usersArray.length()) {
                     val obj = usersArray.getJSONObject(i)
@@ -222,7 +229,7 @@ fun CalendarEventScreen(
                         newList.add(UserData(uId, isAttivo))
                     }
                 }
-                
+
                 if (allUsers.size != newList.size || allUsers.zip(newList).any { it.first != it.second }) {
                     allUsers.clear()
                     allUsers.addAll(newList)
@@ -236,20 +243,24 @@ fun CalendarEventScreen(
 
     val filteredUsers = remember(localFriendSearchQuery, allUsers, friends) {
         if (localFriendSearchQuery.isBlank()) emptyList()
-        else allUsers.filter { 
-            it.userId.contains(localFriendSearchQuery, ignoreCase = true) && !friends.contains(it.userId) 
+        else allUsers.filter {
+            it.userId.contains(localFriendSearchQuery, ignoreCase = true) && !friends.contains(it.userId)
         }
     }
 
     val filteredAcceptedEvents = remember(searchQuery, acceptedEvents) {
         if (searchQuery.isBlank()) acceptedEvents
-        else acceptedEvents.filter { 
-            it.title.contains(searchQuery, ignoreCase = true) || 
-            it.description.contains(searchQuery, ignoreCase = true) 
+        else acceptedEvents.filter {
+            it.title.contains(searchQuery, ignoreCase = true) ||
+                    it.description.contains(searchQuery, ignoreCase = true)
         }
     }
 
-    Column(modifier = modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = uiSpec.screenHorizontalPadding, vertical = if (uiSpec.isLargeText) 10.dp else 8.dp)
+    ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -257,18 +268,18 @@ fun CalendarEventScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Community", 
+                    "Community",
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                IconButton(onClick = { showFriendsDialog = true }, modifier = Modifier.size(40.dp)) {
+                IconButton(onClick = { showFriendsDialog = true }, modifier = Modifier.size(communityActionSize)) {
                     Icon(Icons.Default.Group, contentDescription = "Amici")
                 }
             }
             Text(
-                "($userId)", 
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), 
+                "($userId)",
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
                     .padding(bottom = 4.dp)
@@ -283,33 +294,35 @@ fun CalendarEventScreen(
                     )
             )
         }
-        
-        Spacer(Modifier.height(4.dp))
-        
+
+        Spacer(Modifier.height(if (uiSpec.isLargeText) 6.dp else 4.dp))
+
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(8.dp)) {
+            Column(Modifier.padding(cardInnerPadding)) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable { showDatePicker = true }
-                        .padding(12.dp),
+                        .padding(if (uiSpec.isLargeText) 14.dp else 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(Icons.Default.CalendarToday, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(if (uiSpec.isLargeText) 14.dp else 12.dp))
                     Column {
                         Text("Data Selezionata", style = MaterialTheme.typography.labelSmall)
                         Text(formattedDate, style = MaterialTheme.typography.bodyLarge)
                     }
                 }
-                
-                Spacer(Modifier.height(8.dp))
-                
+
+                Spacer(Modifier.height(sectionGap))
+
                 Button(
                     onClick = { showCreateDialog = true },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = uiSpec.actionButtonSize),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null)
@@ -318,15 +331,15 @@ fun CalendarEventScreen(
                 }
             }
         }
-        
-        Spacer(Modifier.height(16.dp))
-        
+
+        Spacer(Modifier.height(if (uiSpec.isLargeText) 18.dp else 16.dp))
+
         if (invitations.isNotEmpty()) {
             Text("Inviti Ricevuti", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(sectionGap))
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(uiSpec.listItemSpacing)
             ) {
                 items(invitations) { invitation ->
                     InvitationCard(
@@ -364,12 +377,12 @@ fun CalendarEventScreen(
                     )
                 }
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(if (uiSpec.isLargeText) 18.dp else 16.dp))
         }
-        
+
         Text("I tuoi Eventi", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.height(8.dp))
-        
+        Spacer(Modifier.height(sectionGap))
+
         if (filteredAcceptedEvents.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("Nessun evento in questa data o corrispondente alla ricerca", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
@@ -377,7 +390,7 @@ fun CalendarEventScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(uiSpec.listItemSpacing)
             ) {
                 items(filteredAcceptedEvents) { event ->
                     EventCard(
@@ -477,7 +490,7 @@ fun CalendarEventScreen(
             onDismissRequest = { showFriendsDialog = false },
             title = { Text("Gestione Community") },
             text = {
-                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(sectionGap)) {
                     OutlinedTextField(
                         value = localFriendSearchQuery,
                         onValueChange = { localFriendSearchQuery = it },
@@ -485,10 +498,10 @@ fun CalendarEventScreen(
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
                     )
-                    
+
                     if (localFriendSearchQuery.isNotBlank()) {
                         Text("Risultati Ricerca", style = MaterialTheme.typography.labelSmall)
-                        LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
+                        LazyColumn(modifier = Modifier.heightIn(max = contactListMaxHeight)) {
                             items(filteredUsers) { user ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -505,21 +518,21 @@ fun CalendarEventScreen(
                                         Spacer(Modifier.width(8.dp))
                                         Text(user.userId, style = MaterialTheme.typography.bodyMedium)
                                     }
-                                    IconButton(onClick = { 
+                                    IconButton(onClick = {
                                         presenceManager.addFriend(user.userId)
                                         friends.add(user.userId)
-                                    }) {
+                                    }, modifier = Modifier.size(uiSpec.actionButtonSize)) {
                                         Icon(Icons.Default.PersonAdd, contentDescription = "Aggiungi", tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             }
                         }
                     }
-                    
+
                     HorizontalDivider()
-                    
+
                     Text("I tuoi contatti (${friends.size})", style = MaterialTheme.typography.labelSmall)
-                    LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
+                    LazyColumn(modifier = Modifier.heightIn(max = contactListMaxHeight)) {
                         items(friends) { friendId ->
                             val isOnline = allUsers.find { it.userId == friendId }?.isAttivo ?: false
                             Row(
@@ -537,10 +550,10 @@ fun CalendarEventScreen(
                                     Spacer(Modifier.width(8.dp))
                                     Text(friendId, style = MaterialTheme.typography.bodyMedium)
                                 }
-                                IconButton(onClick = { 
+                                IconButton(onClick = {
                                     presenceManager.removeFriend(friendId)
                                     friends.remove(friendId)
-                                }) {
+                                }, modifier = Modifier.size(uiSpec.actionButtonSize)) {
                                     Icon(Icons.Default.Delete, contentDescription = "Rimuovi", tint = MaterialTheme.colorScheme.error)
                                 }
                             }
@@ -587,25 +600,31 @@ fun CalendarEventScreen(
 
 @Composable
 fun InvitationCard(invitation: CalendarEventInvitation, onAccept: () -> Unit, onRefuse: () -> Unit) {
+    val uiSpec = rememberResponsiveUiSpec()
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
     ) {
-        Column(Modifier.padding(12.dp)) {
+        Column(Modifier.padding(if (uiSpec.isLargeText) 14.dp else 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Mail, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
                 Text("Invito da: ${invitation.senderId}", style = MaterialTheme.typography.labelMedium)
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(if (uiSpec.isLargeText) 10.dp else 8.dp))
             Text(invitation.event.title, style = MaterialTheme.typography.titleMedium)
             Text(invitation.event.date, style = MaterialTheme.typography.bodySmall)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(if (uiSpec.isLargeText) 14.dp else 12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                OutlinedButton(onClick = onRefuse, modifier = Modifier.padding(end = 8.dp)) {
+                OutlinedButton(
+                    onClick = onRefuse,
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .heightIn(min = uiSpec.actionButtonSize)
+                ) {
                     Text("Rifiuta")
                 }
-                Button(onClick = onAccept) {
+                Button(onClick = onAccept, modifier = Modifier.heightIn(min = uiSpec.actionButtonSize)) {
                     Text("Accetta")
                 }
             }
@@ -615,24 +634,25 @@ fun InvitationCard(invitation: CalendarEventInvitation, onAccept: () -> Unit, on
 
 @Composable
 fun EventCard(event: CalendarEvent, onClick: () -> Unit) {
+    val uiSpec = rememberResponsiveUiSpec()
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(if (uiSpec.isLargeText) 18.dp else 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(if (uiSpec.isLargeText) 44.dp else 40.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Default.Event, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             }
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(if (uiSpec.isLargeText) 18.dp else 16.dp))
             Column(Modifier.weight(1f)) {
                 Text(event.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("${event.date} • ${event.ownerId}", style = MaterialTheme.typography.bodySmall)

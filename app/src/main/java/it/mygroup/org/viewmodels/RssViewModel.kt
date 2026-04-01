@@ -1,6 +1,7 @@
 package it.mygroup.org.viewmodels
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -36,6 +37,12 @@ class RssViewModel(private val rssRepository: RssRepository) : ViewModel() {
     var selectedCategory by mutableStateOf(RssCategory.ALL)
         private set
 
+    // Visible items for lazy loading / pagination
+    private var allFilteredItems: List<RssItem> = emptyList()
+    val visibleItems = mutableStateListOf<RssItem>()
+    private var currentPage = 1
+    private val pageSize = 10
+
     private val feedConfigs = listOf(
         "https://cacciaepesca.azurewebsites.net/api/generate-feed?url=https://www.cacciapassione.com/notizie/ultime/&extractionMode=basic" to RssCategory.CACCIA,
         "https://cacciaepesca.azurewebsites.net/api/generate-feed?url=https://www.pescaok.it/articoli/&extractionMode=basic" to RssCategory.PESCA
@@ -47,6 +54,7 @@ class RssViewModel(private val rssRepository: RssRepository) : ViewModel() {
 
     fun updateCategory(category: RssCategory) {
         selectedCategory = category
+        refreshVisibleItems("")
     }
 
     fun getRssFeeds(silent: Boolean = false) {
@@ -55,7 +63,6 @@ class RssViewModel(private val rssRepository: RssRepository) : ViewModel() {
             else isRefreshing = true
             
             try {
-                // Fetch feeds in parallel and assign categories
                 val deferredItems = feedConfigs.map { (url, category) ->
                     async { 
                         try {
@@ -67,11 +74,10 @@ class RssViewModel(private val rssRepository: RssRepository) : ViewModel() {
                 }
                 
                 val allItems = deferredItems.flatMap { it.await() }
-                
-                // Sort by date descendant
                 val sortedItems = allItems.sortedByDescending { parseDate(it.pubDate) }
                 
                 rssUiState = RssUiState.Success(sortedItems)
+                refreshVisibleItems("")
             } catch (e: IOException) {
                 if (!silent) rssUiState = RssUiState.Error
             } catch (e: Exception) {
@@ -79,6 +85,29 @@ class RssViewModel(private val rssRepository: RssRepository) : ViewModel() {
             } finally {
                 isRefreshing = false
             }
+        }
+    }
+
+    fun refreshVisibleItems(searchQuery: String) {
+        val state = rssUiState
+        if (state is RssUiState.Success) {
+            allFilteredItems = state.items.filter { item ->
+                val matchesSearch = searchQuery.isBlank() || item.title.contains(searchQuery, ignoreCase = true)
+                val matchesCategory = selectedCategory == RssCategory.ALL || item.category == selectedCategory
+                matchesSearch && matchesCategory
+            }
+            currentPage = 1
+            visibleItems.clear()
+            loadMoreItems()
+        }
+    }
+
+    fun loadMoreItems() {
+        val start = (currentPage - 1) * pageSize
+        if (start < allFilteredItems.size) {
+            val end = minOf(start + pageSize, allFilteredItems.size)
+            visibleItems.addAll(allFilteredItems.subList(start, end))
+            currentPage++
         }
     }
 
@@ -96,7 +125,7 @@ class RssViewModel(private val rssRepository: RssRepository) : ViewModel() {
                 continue
             }
         }
-        return Date(0) // Fallback for unknown formats
+        return Date(0)
     }
 
     companion object {

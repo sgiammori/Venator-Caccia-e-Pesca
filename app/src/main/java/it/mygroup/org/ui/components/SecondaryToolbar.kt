@@ -3,6 +3,7 @@ package it.mygroup.org.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import it.mygroup.org.ui.HomeSubView
+import it.mygroup.org.ui.theme.rememberResponsiveUiSpec
 
 @Composable
 fun SecondaryToolbar(
@@ -38,6 +40,10 @@ fun SecondaryToolbar(
     onAiManagerClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val uiSpec = rememberResponsiveUiSpec()
+    val toolbarHorizontalPadding = (uiSpec.screenHorizontalPadding - 4.dp).coerceAtLeast(6.dp)
+    val toolbarVerticalPadding = if (uiSpec.isLargeText) 6.dp else 4.dp
+
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = modifier.fillMaxWidth()
@@ -45,7 +51,7 @@ fun SecondaryToolbar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .padding(horizontal = toolbarHorizontalPadding, vertical = toolbarVerticalPadding),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -53,31 +59,36 @@ fun SecondaryToolbar(
                 icon = Icons.Default.RssFeed,
                 contentDescription = "RSS Feed",
                 isSelected = currentView == HomeSubView.RSS,
-                onClick = onRssClick
+                onClick = onRssClick,
+                iconContainerSize = uiSpec.actionButtonSize + 2.dp
             )
             SecondaryToolbarItem(
                 icon = Icons.Default.Map,
                 contentDescription = "Laws Map",
                 isSelected = currentView == HomeSubView.MAP,
-                onClick = onMapClick
+                onClick = onMapClick,
+                iconContainerSize = uiSpec.actionButtonSize + 2.dp
             )
             SecondaryToolbarItem(
                 icon = Icons.Default.Storage,
                 contentDescription = "Personal Database",
                 isSelected = currentView == HomeSubView.DATABASE,
-                onClick = onDatabaseClick
+                onClick = onDatabaseClick,
+                iconContainerSize = uiSpec.actionButtonSize + 2.dp
             )
             SecondaryToolbarItem(
                 icon = Icons.Default.DateRange,
                 contentDescription = "Scheduled Events",
                 isSelected = currentView == HomeSubView.EVENTS,
-                onClick = onEventsClick
+                onClick = onEventsClick,
+                iconContainerSize = uiSpec.actionButtonSize + 2.dp
             )
             SecondaryToolbarItem(
                 icon = Icons.Default.AutoAwesome,
                 contentDescription = "AI Manager",
                 isSelected = currentView == HomeSubView.AI_MANAGER,
-                onClick = onAiManagerClick
+                onClick = onAiManagerClick,
+                iconContainerSize = uiSpec.actionButtonSize + 2.dp
             )
         }
     }
@@ -89,6 +100,7 @@ private fun SecondaryToolbarItem(
     contentDescription: String,
     isSelected: Boolean,
     onClick: () -> Unit,
+    iconContainerSize: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier
 ) {
     val background = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
@@ -96,19 +108,20 @@ private fun SecondaryToolbarItem(
 
     Box(
         modifier = Modifier
-            .size(48.dp)
+            .size(iconContainerSize)
             .clip(CircleShape)
             .background(background),
         contentAlignment = Alignment.Center
     ) {
         IconButton(
             onClick = onClick,
-            modifier = modifier
+            modifier = modifier.fillMaxSize()
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                tint = tint
+                tint = tint,
+                modifier = Modifier.size(22.dp)
             )
         }
     }

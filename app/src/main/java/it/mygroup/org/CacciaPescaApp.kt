@@ -1,15 +1,18 @@
 package it.mygroup.org
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,8 +37,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import it.mygroup.org.ui.theme.rememberResponsiveUiSpec
 import it.mygroup.org.ui.navigation.CacciaPescaNavHost
 
 @Composable
@@ -46,7 +51,7 @@ fun CacciaPescaApp(navController: NavHostController = rememberNavController()) {
 }
 
 /**
- * App bar to display title and conditionally display the back navigation.
+ * App bar to display title and conditionally display actions.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,12 +61,14 @@ fun InventoryTopAppBar(
     modifier: Modifier = Modifier,
     scrollBehavior: TopAppBarScrollBehavior? = null,
     showSearch: Boolean = false,
+    showAdd: Boolean = false,
+    showStorico: Boolean = false,
+    showMenu: Boolean = true,
     isSearchActive: Boolean = false,
     onSearchActiveChange: (Boolean) -> Unit = {},
     searchQuery: String = "",
     onSearchQueryChange: (String) -> Unit = {},
     onAddClick: () -> Unit = {},
-    onMenuClick: () -> Unit = {},
     onNavigateToStorico: () -> Unit = {},
     onNavigateToPrivacyPolicy: () -> Unit = {},
     navigateUp: () -> Unit
@@ -69,6 +76,8 @@ fun InventoryTopAppBar(
     var menuExpanded by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+    val uiSpec = rememberResponsiveUiSpec()
+    val actionSize = uiSpec.actionButtonSize
 
     LaunchedEffect(isSearchActive) {
         if (isSearchActive) {
@@ -78,7 +87,7 @@ fun InventoryTopAppBar(
         }
     }
 
-    CenterAlignedTopAppBar(
+    TopAppBar(
         title = {
             if (isSearchActive) {
                 TextField(
@@ -87,8 +96,14 @@ fun InventoryTopAppBar(
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(focusRequester),
-                    placeholder = { Text("Cerca...") },
+                    placeholder = {
+                        Text(
+                            text = "Cerca...",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = uiSpec.inputTextSize)
+                        )
+                    },
                     singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = uiSpec.inputTextSize),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
@@ -98,28 +113,37 @@ fun InventoryTopAppBar(
                     ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     trailingIcon = {
-                        IconButton(onClick = { 
+                        IconButton(
+                            onClick = {
                             onSearchActiveChange(false)
                             onSearchQueryChange("")
-                        }) {
+                        },
+                            modifier = Modifier.size(actionSize)
+                        ) {
                             Icon(Icons.Default.Close, contentDescription = "Chiudi ricerca")
                         }
                     }
                 )
             } else {
-                Text(title)
+                Text(
+                    text = title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.titleLarge
+                )
             }
         },
         modifier = modifier,
+        windowInsets = WindowInsets(0, 0, 0, 0),
         scrollBehavior = scrollBehavior,
-        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+        colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             titleContentColor = MaterialTheme.colorScheme.onSurface,
             actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
         ),
         navigationIcon = {
             if (canNavigateBack) {
-                IconButton(onClick = navigateUp) {
+                IconButton(onClick = navigateUp, modifier = Modifier.size(actionSize)) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back"
@@ -128,45 +152,40 @@ fun InventoryTopAppBar(
             }
         },
         actions = {
-            if (showSearch && !isSearchActive) {
-                IconButton(onClick = { onSearchActiveChange(true) }) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search"
-                    )
+            if (!isSearchActive) {
+                if (showSearch) {
+                    IconButton(onClick = { onSearchActiveChange(true) }, modifier = Modifier.size(actionSize)) {
+                        Icon(Icons.Default.Search, contentDescription = "Search")
+                    }
                 }
-            }
-            IconButton(onClick = onAddClick) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add"
-                )
-            }
-            Box {
-                IconButton(onClick = { menuExpanded = true }) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "Menu"
-                    )
+                if (showAdd) {
+                    IconButton(onClick = onAddClick, modifier = Modifier.size(actionSize)) {
+                        Icon(Icons.Default.Add, contentDescription = "Add")
+                    }
                 }
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Storico") },
-                        onClick = {
-                            menuExpanded = false
-                            onNavigateToStorico()
+                if (showStorico) {
+                    IconButton(onClick = onNavigateToStorico, modifier = Modifier.size(actionSize)) {
+                        Icon(Icons.Default.History, contentDescription = "Storico")
+                    }
+                }
+                if (showMenu) {
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(actionSize)) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Menu")
                         }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.privacy_policy_title)) },
-                        onClick = {
-                            menuExpanded = false
-                            onNavigateToPrivacyPolicy()
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.privacy_policy_title)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onNavigateToPrivacyPolicy()
+                                }
+                            )
                         }
-                    )
+                    }
                 }
             }
         }

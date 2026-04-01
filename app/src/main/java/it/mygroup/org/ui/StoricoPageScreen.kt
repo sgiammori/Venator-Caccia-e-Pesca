@@ -18,7 +18,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -26,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import it.mygroup.org.InventoryTopAppBar
 import it.mygroup.org.R
 import it.mygroup.org.ui.navigation.NavigationDestination
+import it.mygroup.org.ui.theme.rememberResponsiveUiSpec
 import it.mygroup.org.viewmodels.StoricoPageViewModel
 import java.util.Locale
 
@@ -49,6 +49,7 @@ fun StoricoPageScreen(
 ) {
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
     val uiState by viewModel.storicoPageUiState.collectAsState()
+    val uiSpec = rememberResponsiveUiSpec()
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0), // RIMUOVE LO SPAZIO VUOTO IN FONDO
@@ -58,7 +59,8 @@ fun StoricoPageScreen(
                 title = stringResource(StoricoPageScreenDestination.titleRes),
                 canNavigateBack = canNavigateBack,
                 navigateUp = { navigateBack() },
-                scrollBehavior = scrollBehavior
+                scrollBehavior = scrollBehavior,
+                showMenu = false
             )
         }
     ) { innerPadding ->
@@ -83,18 +85,19 @@ fun StoricoPageScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     top = innerPadding.calculateTopPadding(),
-                    start = 0.dp,
-                    end = 0.dp,
+                    start = uiSpec.screenHorizontalPadding,
+                    end = uiSpec.screenHorizontalPadding,
                     bottom = 0.dp // Forza a zero per evitare gap sopra il banner
-                )
+                ),
+                verticalArrangement = Arrangement.spacedBy(uiSpec.listItemSpacing)
             ) {
                 item {
                     Surface(
-                        modifier = Modifier.fillMaxWidth().padding(dimensionResource(id = R.dimen.padding_small)),
+                        modifier = Modifier.fillMaxWidth(),
                         color = MaterialTheme.colorScheme.primaryContainer,
                         shape = MaterialTheme.shapes.medium
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
+                        Column(modifier = Modifier.padding(if (uiSpec.isLargeText) 18.dp else 16.dp)) {
                             Text(
                                 text = "Peso Totale Periodo",
                                 style = MaterialTheme.typography.labelLarge,
@@ -122,8 +125,8 @@ fun StoricoPageScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .padding(dimensionResource(id = R.dimen.padding_small)),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                .padding(if (uiSpec.isLargeText) 12.dp else 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(if (uiSpec.isLargeText) 6.dp else 4.dp)
                         ) {
                             Text(
                                 text = "Totale $displayNome",
@@ -149,7 +152,6 @@ fun StoricoPageScreen(
                         InventoryItem(
                             item = item,
                             modifier = Modifier
-                                .padding(dimensionResource(id = R.dimen.padding_small))
                                 .clickable { navigateToItemUpdate(item.id) }
                         )
                     }
