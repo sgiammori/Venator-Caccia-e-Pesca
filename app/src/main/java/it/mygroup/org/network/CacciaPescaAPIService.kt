@@ -59,9 +59,9 @@ interface CacciaPescaAPIService {
  */
 object CacciaPescaApi {
     private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS) // Ridotto timeout per fail fast
-        .readTimeout(10, TimeUnit.SECONDS)
-        .writeTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(30, TimeUnit.SECONDS) // Aumentato timeout per gestire cold start e scraping lento
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
         .build()

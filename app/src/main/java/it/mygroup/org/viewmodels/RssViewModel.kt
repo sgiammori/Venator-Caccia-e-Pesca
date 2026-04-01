@@ -1,5 +1,6 @@
 package it.mygroup.org.viewmodels
 
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -13,7 +14,7 @@ import it.mygroup.org.CacciaPescaApplication
 import it.mygroup.org.data.RssRepository
 import it.mygroup.org.network.RssCategory
 import it.mygroup.org.network.RssItem
-import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -63,24 +64,34 @@ class RssViewModel(private val rssRepository: RssRepository) : ViewModel() {
             else isRefreshing = true
             
             try {
-                val deferredItems = feedConfigs.map { (url, category) ->
-                    async { 
-                        try {
-                            rssRepository.getRssFeed(url).map { it.copy(category = category) }
-                        } catch (e: Exception) {
-                            emptyList<RssItem>()
-                        }
+                Log.d("RssViewModel", "Starting to fetch RSS feeds sequentially...")
+                val allItems = mutableListOf<RssItem>()
+                
+                for ((url, category) in feedConfigs) {
+                    try {
+                        Log.d("RssViewModel", "Fetching $category from $url")
+                        val items = rssRepository.getRssFeed(url).map { it.copy(category = category) }
+                        Log.d("RssViewModel", "Successfully fetched ${items.size} items for $category")
+                        allItems.addAll(items)
+                    } catch (e: Exception) {
+                        Log.e("RssViewModel", "Error fetching category $category", e)
+                        // Non-blocking: continue with next category even if one fails
                     }
+                    // Aggiunto un delay di 1 secondo tra le richieste per evitare sovraccarico sulla Function App
+                    delay(1000)
                 }
                 
-                val allItems = deferredItems.flatMap { it.await() }
+                Log.d("RssViewModel", "Total items loaded: ${allItems.size}")
+                
                 val sortedItems = allItems.sortedByDescending { parseDate(it.pubDate) }
                 
                 rssUiState = RssUiState.Success(sortedItems)
                 refreshVisibleItems("")
             } catch (e: IOException) {
+                Log.e("RssViewModel", "IOException in getRssFeeds", e)
                 if (!silent) rssUiState = RssUiState.Error
             } catch (e: Exception) {
+                Log.e("RssViewModel", "Unexpected Exception in getRssFeeds", e)
                 if (!silent) rssUiState = RssUiState.Error
             } finally {
                 isRefreshing = false
