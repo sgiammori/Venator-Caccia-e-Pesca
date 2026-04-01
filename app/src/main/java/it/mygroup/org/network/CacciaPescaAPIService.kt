@@ -35,10 +35,14 @@ interface CacciaPescaAPIService {
     @POST("api/get-invites")
     suspend fun deleteEvent(@Body jsonBody: String): String
 
-    @Headers("Content-Type: application/json")
+    @Headers(
+        "Content-Type: application/json",
+        "x-app-key: my*se_!et*key"
+    )
     @POST("api/authenticate-app")
     suspend fun authenticateApp(@Body jsonBody: String): String
 
+    @Headers("x-app-key: my*se_!et*key")
     @GET("api/get-all-users")
     suspend fun getAllUsers(): String
 
@@ -68,8 +72,8 @@ object CacciaPescaApi {
 
     private val retrofit = Retrofit.Builder()
         .addConverterFactory(ScalarsConverterFactory.create())
-        // Per test in localhost dall'emulatore Android, usa l'IP 10.0.2.2
-        // Assicurati che il server sia in ascolto su tutte le interfacce (0.0.0.0) e non solo localhost
+        // Per test in localhost dall'emulatore Android, usa l'IP locale 192.168.0.x
+        // Assicurati che il server sia in ascolto su tutte le interfacce (func start --cors * --host 0.0.0.0) e non solo localhost
         .baseUrl("http://cacciaepesca.azurewebsites.net/")
         .client(client)
         .build()
