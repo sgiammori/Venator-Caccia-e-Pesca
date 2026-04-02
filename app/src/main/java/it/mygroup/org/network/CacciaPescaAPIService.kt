@@ -24,38 +24,6 @@ interface CacciaPescaAPIService {
     @GET
     suspend fun getRssFeed(@Url url: String): String
 
-    @Headers("Content-Type: application/json")
-    @POST("api/send-event")
-    suspend fun sendEvent(@Body jsonBody: String): String
-
-    @GET("api/get-invites")
-    suspend fun getInvites(@Query("userId") userId: String): String
-
-    @Headers("Content-Type: application/json")
-    @POST("api/get-invites")
-    suspend fun deleteEvent(@Body jsonBody: String): String
-
-    @Headers(
-        "Content-Type: application/json",
-        "x-app-key: my*se_!et*key"
-    )
-    @POST("api/authenticate-app")
-    suspend fun authenticateApp(@Body jsonBody: String): String
-
-    @Headers("x-app-key: my*se_!et*key")
-    @GET("api/get-all-users")
-    suspend fun getAllUsers(): String
-
-    @GET("api/respond-to-invite")
-    suspend fun respondToInvite(
-        @Query("eventId") eventId: String,
-        @Query("userId") userId: String,
-        @Query("action") action: String
-    ): String
-
-    @Headers("Content-Type: application/json")
-    @POST("api/create-event")
-    suspend fun createEvent(@Body jsonBody: String): String
 }
 
 /**

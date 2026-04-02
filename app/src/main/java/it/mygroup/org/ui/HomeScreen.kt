@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import it.mygroup.org.InventoryTopAppBar
 import it.mygroup.org.R
-import it.mygroup.org.network.UserPresenceManager
 import it.mygroup.org.ui.components.SecondaryToolbar
 import it.mygroup.org.ui.navigation.NavigationDestination
 import it.mygroup.org.viewmodels.RssViewModel
@@ -35,7 +34,7 @@ object HomeDestination : NavigationDestination {
 }
 
 enum class HomeSubView {
-    DEFAULT, RSS, MAP, DATABASE, EVENTS, AI_MANAGER
+    DEFAULT, RSS, MAP, DATABASE, AI_MANAGER
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,9 +49,6 @@ fun HomeScreen(
     onItemSavedConsumed: () -> Unit = {},
     rssViewModel: RssViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
-    val context = LocalContext.current
-    val presenceManager = remember { UserPresenceManager.getInstance(context) }
-    val userId = presenceManager.userId
     
     var currentSubView by rememberSaveable { mutableStateOf(HomeSubView.RSS) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -100,7 +96,7 @@ fun HomeScreen(
                     canNavigateBack = false,
                     navigateUp = {},
                     scrollBehavior = scrollBehavior,
-                    showSearch = currentSubView == HomeSubView.RSS || currentSubView == HomeSubView.EVENTS,
+                    showSearch = currentSubView == HomeSubView.RSS,
                     showAdd = true,
                     showStorico = true,
                     showMenu = true,
@@ -128,11 +124,6 @@ fun HomeScreen(
                         currentSubView = HomeSubView.DATABASE 
                         isSearchActive = false
                         searchQuery = ""
-                    },
-                    onEventsClick = { 
-                        currentSubView = HomeSubView.EVENTS 
-                        isSearchActive = false
-                        searchQuery = "" 
                     },
                     onAiManagerClick = { 
                         currentSubView = HomeSubView.AI_MANAGER 
@@ -164,11 +155,6 @@ fun HomeScreen(
                 HomeSubView.DATABASE -> ItemDailyEntries(
                     navigateToItemEntry = navigateToItemEntry,
                     navigateToItemUpdate = navigateToItemUpdate,
-                    modifier = Modifier.fillMaxSize()
-                )
-                HomeSubView.EVENTS -> CalendarEventScreen(
-                    userId = userId,
-                    searchQuery = searchQuery,
                     modifier = Modifier.fillMaxSize()
                 )
                 HomeSubView.AI_MANAGER -> IAManagerScreen(

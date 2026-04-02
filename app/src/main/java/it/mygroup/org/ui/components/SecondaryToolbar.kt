@@ -36,7 +36,6 @@ fun SecondaryToolbar(
     onRssClick: () -> Unit,
     onMapClick: () -> Unit,
     onDatabaseClick: () -> Unit,
-    onEventsClick: () -> Unit,
     onAiManagerClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -74,13 +73,6 @@ fun SecondaryToolbar(
                 contentDescription = "Personal Database",
                 isSelected = currentView == HomeSubView.DATABASE,
                 onClick = onDatabaseClick,
-                iconContainerSize = uiSpec.actionButtonSize + 2.dp
-            )
-            SecondaryToolbarItem(
-                icon = Icons.Default.DateRange,
-                contentDescription = "Scheduled Events",
-                isSelected = currentView == HomeSubView.EVENTS,
-                onClick = onEventsClick,
                 iconContainerSize = uiSpec.actionButtonSize + 2.dp
             )
             SecondaryToolbarItem(
